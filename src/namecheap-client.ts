@@ -1,27 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-
-interface NamecheapResponse {
-  ApiResponse: {
-    Status: string;
-    Errors: {
-      Error?: Array<{
-        Number: string;
-        Text: string;
-      }>;
-    };
-    Warnings: any;
-    RequestedCommand: string;
-    CommandResponse: any;
-  };
-}
-
-interface DnsHost {
-  hostname: string;
-  recordType: string;
-  address: string;
-  mxPriority?: number;
-  ttl?: number;
-}
+import type { DnsHost, DomainsListParams } from './types.js';
 
 export class NamecheapClient {
   private axios: AxiosInstance;
@@ -49,7 +27,7 @@ export class NamecheapClient {
     });
   }
 
-  private parseXmlToJson(xml: string): any {
+  private parseXmlToJson(xml: string): unknown {
     // Simple XML to JSON conversion for Namecheap responses
     // In production, you might want to use a proper XML parser
     const jsonStr = xml
@@ -69,12 +47,7 @@ export class NamecheapClient {
     }
   }
 
-  async domainsList(options: {
-    listType?: string;
-    searchTerm?: string;
-    page?: number;
-    pageSize?: number;
-  } = {}) {
+  async domainsList(options: DomainsListParams = {}) {
     const response = await this.axios.get('', {
       params: {
         Command: 'namecheap.domains.getList',
@@ -125,7 +98,7 @@ export class NamecheapClient {
   }
 
   async dnsSetCustom(sld: string, tld: string, nameservers: string[]) {
-    const params: any = {
+    const params: Record<string, string> = {
       Command: 'namecheap.domains.dns.setCustom',
       SLD: sld,
       TLD: tld,
@@ -142,7 +115,7 @@ export class NamecheapClient {
   }
 
   async dnsSetHosts(sld: string, tld: string, hosts: DnsHost[]) {
-    const params: any = {
+    const params: Record<string, string | number> = {
       Command: 'namecheap.domains.dns.setHosts',
       SLD: sld,
       TLD: tld,
