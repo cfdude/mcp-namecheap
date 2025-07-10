@@ -90,7 +90,13 @@ export interface DomainsCreateParams {
   eapFee?: number;
 }
 
-export type DomainsGetTldListParams = Record<string, never>;
+export interface DomainsGetTldListParams {
+  search?: string;
+  registerable?: boolean;
+  page?: number;
+  pageSize?: number;
+  sortBy?: 'name' | 'popularity';
+}
 
 export interface DomainsSetContactsParams {
   domainName: string;

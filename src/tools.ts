@@ -198,10 +198,36 @@ export const namecheapTools: Tool[] = [
   },
   {
     name: 'namecheap_domains_gettldlist',
-    description: 'Get a list of all supported TLDs',
+    description: 'Get a list of all supported TLDs with filtering and pagination',
     inputSchema: {
       type: 'object',
-      properties: {},
+      properties: {
+        search: {
+          type: 'string',
+          description: 'Search for TLDs containing this text (e.g., "com", "org", "tech")',
+        },
+        registerable: {
+          type: 'boolean',
+          description: 'Filter to only show TLDs that can be registered via API',
+        },
+        page: {
+          type: 'number',
+          description: 'Page number for pagination (default: 1)',
+          default: 1,
+        },
+        pageSize: {
+          type: 'number',
+          description: 'Number of TLDs per page (default: 50, max: 200)',
+          default: 50,
+          maximum: 200,
+        },
+        sortBy: {
+          type: 'string',
+          enum: ['name', 'popularity'],
+          description: 'Sort TLDs by name or popularity',
+          default: 'name',
+        },
+      },
     },
   },
   {
