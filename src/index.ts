@@ -10,6 +10,14 @@ import {
 import dotenv from 'dotenv';
 import { NamecheapClient } from './namecheap-client.js';
 import { namecheapTools } from './tools.js';
+import type {
+  DomainsListParams,
+  DomainsCheckParams,
+  DomainsGetInfoParams,
+  DnsGetListParams,
+  DnsSetCustomParams,
+  DnsSetHostsParams
+} from './types.js';
 
 dotenv.config();
 
@@ -69,22 +77,22 @@ class NamecheapMcpServer {
         try {
           switch (name) {
             case 'namecheap_domains_list':
-              return await this.handleDomainsList(args);
+              return await this.handleDomainsList((args as unknown as DomainsListParams) || {});
             
             case 'namecheap_domains_check':
-              return await this.handleDomainsCheck(args);
+              return await this.handleDomainsCheck(args as unknown as DomainsCheckParams);
             
             case 'namecheap_domains_getinfo':
-              return await this.handleDomainsGetInfo(args);
+              return await this.handleDomainsGetInfo(args as unknown as DomainsGetInfoParams);
             
             case 'namecheap_dns_getlist':
-              return await this.handleDnsGetList(args);
+              return await this.handleDnsGetList(args as unknown as DnsGetListParams);
             
             case 'namecheap_dns_setcustom':
-              return await this.handleDnsSetCustom(args);
+              return await this.handleDnsSetCustom(args as unknown as DnsSetCustomParams);
             
             case 'namecheap_dns_sethosts':
-              return await this.handleDnsSetHosts(args);
+              return await this.handleDnsSetHosts(args as unknown as DnsSetHostsParams);
             
             default:
               throw new McpError(
@@ -104,7 +112,7 @@ class NamecheapMcpServer {
     );
   }
 
-  private async handleDomainsList(args: any) {
+  private async handleDomainsList(args: DomainsListParams) {
     const result = await this.namecheapClient.domainsList(args);
     return {
       content: [
@@ -116,7 +124,7 @@ class NamecheapMcpServer {
     };
   }
 
-  private async handleDomainsCheck(args: any) {
+  private async handleDomainsCheck(args: DomainsCheckParams) {
     const { domains } = args;
     if (!domains || !Array.isArray(domains)) {
       throw new McpError(
@@ -136,7 +144,7 @@ class NamecheapMcpServer {
     };
   }
 
-  private async handleDomainsGetInfo(args: any) {
+  private async handleDomainsGetInfo(args: DomainsGetInfoParams) {
     const { domain } = args;
     if (!domain) {
       throw new McpError(
@@ -156,8 +164,8 @@ class NamecheapMcpServer {
     };
   }
 
-  private async handleDnsGetList(args: any) {
-    const { domain, sld, tld } = args;
+  private async handleDnsGetList(args: DnsGetListParams) {
+    const { sld, tld } = args;
     if (!sld || !tld) {
       throw new McpError(
         ErrorCode.InvalidParams,
@@ -176,7 +184,7 @@ class NamecheapMcpServer {
     };
   }
 
-  private async handleDnsSetCustom(args: any) {
+  private async handleDnsSetCustom(args: DnsSetCustomParams) {
     const { sld, tld, nameservers } = args;
     if (!sld || !tld || !nameservers || !Array.isArray(nameservers)) {
       throw new McpError(
@@ -196,7 +204,7 @@ class NamecheapMcpServer {
     };
   }
 
-  private async handleDnsSetHosts(args: any) {
+  private async handleDnsSetHosts(args: DnsSetHostsParams) {
     const { sld, tld, hosts } = args;
     if (!sld || !tld || !hosts || !Array.isArray(hosts)) {
       throw new McpError(
