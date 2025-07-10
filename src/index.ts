@@ -1,4 +1,5 @@
-#!/usr/bin/env node
+#!/usr/bin/env node --no-warnings
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -14,20 +15,35 @@ import type {
   DomainsListParams,
   DomainsCheckParams,
   DomainsGetInfoParams,
+  DomainsGetContactsParams,
+  DomainsCreateParams,
+  DomainsGetTldListParams,
+  DomainsSetContactsParams,
+  DomainsReactivateParams,
+  DomainsRenewParams,
+  DomainsGetRegistrarLockParams,
+  DomainsSetRegistrarLockParams,
   DnsGetListParams,
   DnsSetCustomParams,
   DnsSetHostsParams
 } from './types.js';
 
+// Load environment variables from .env file for development
+// Claude Desktop will pass them directly via config
 dotenv.config();
 
-const API_KEY = process.env.NAMECHEAP_API_KEY;
+const USE_SANDBOX = process.env.NAMECHEAP_USE_SANDBOX === 'true';
+const API_KEY = USE_SANDBOX 
+  ? process.env.NAMECHEAP_SANDBOX_API_KEY 
+  : process.env.NAMECHEAP_API_KEY;
 const API_USER = process.env.NAMECHEAP_API_USER;
 const CLIENT_IP = process.env.NAMECHEAP_CLIENT_IP;
-const USE_SANDBOX = process.env.NAMECHEAP_USE_SANDBOX === 'true';
 
 if (!API_KEY || !API_USER || !CLIENT_IP) {
-  console.error('Missing required environment variables: NAMECHEAP_API_KEY, NAMECHEAP_API_USER, NAMECHEAP_CLIENT_IP');
+  // Write to stderr to avoid interfering with MCP protocol on stdout
+  process.stderr.write('Missing required environment variables: NAMECHEAP_API_KEY/NAMECHEAP_SANDBOX_API_KEY, NAMECHEAP_API_USER, NAMECHEAP_CLIENT_IP\n');
+  process.stderr.write(`Current env: USE_SANDBOX=${USE_SANDBOX}, API_KEY=${API_KEY ? 'set' : 'missing'}, API_USER=${API_USER || 'missing'}, CLIENT_IP=${CLIENT_IP || 'missing'}\n`);
+  process.stderr.write(`Working directory: ${process.cwd()}\n`);
   process.exit(1);
 }
 
@@ -57,7 +73,7 @@ class NamecheapMcpServer {
 
     this.setupHandlers();
     
-    this.server.onerror = (error) => console.error('[MCP Error]', error);
+    this.server.onerror = (error) => process.stderr.write(`[MCP Error] ${error}\n`);
     process.on('SIGINT', async () => {
       await this.server.close();
       process.exit(0);
@@ -84,6 +100,30 @@ class NamecheapMcpServer {
             
             case 'namecheap_domains_getinfo':
               return await this.handleDomainsGetInfo(args as unknown as DomainsGetInfoParams);
+            
+            case 'namecheap_domains_getcontacts':
+              return await this.handleDomainsGetContacts(args as unknown as DomainsGetContactsParams);
+            
+            case 'namecheap_domains_create':
+              return await this.handleDomainsCreate(args as unknown as DomainsCreateParams);
+            
+            case 'namecheap_domains_gettldlist':
+              return await this.handleDomainsGetTldList(args as unknown as DomainsGetTldListParams);
+            
+            case 'namecheap_domains_setcontacts':
+              return await this.handleDomainsSetContacts(args as unknown as DomainsSetContactsParams);
+            
+            case 'namecheap_domains_reactivate':
+              return await this.handleDomainsReactivate(args as unknown as DomainsReactivateParams);
+            
+            case 'namecheap_domains_renew':
+              return await this.handleDomainsRenew(args as unknown as DomainsRenewParams);
+            
+            case 'namecheap_domains_getregistrarlock':
+              return await this.handleDomainsGetRegistrarLock(args as unknown as DomainsGetRegistrarLockParams);
+            
+            case 'namecheap_domains_setregistrarlock':
+              return await this.handleDomainsSetRegistrarLock(args as unknown as DomainsSetRegistrarLockParams);
             
             case 'namecheap_dns_getlist':
               return await this.handleDnsGetList(args as unknown as DnsGetListParams);
@@ -125,15 +165,15 @@ class NamecheapMcpServer {
   }
 
   private async handleDomainsCheck(args: DomainsCheckParams) {
-    const { domains } = args;
-    if (!domains || !Array.isArray(domains)) {
+    const { domainList } = args;
+    if (!domainList || !Array.isArray(domainList)) {
       throw new McpError(
         ErrorCode.InvalidParams,
-        'domains parameter must be an array'
+        'domainList parameter must be an array'
       );
     }
     
-    const result = await this.namecheapClient.domainsCheck(domains);
+    const result = await this.namecheapClient.domainsCheck(args);
     return {
       content: [
         {
@@ -145,15 +185,159 @@ class NamecheapMcpServer {
   }
 
   private async handleDomainsGetInfo(args: DomainsGetInfoParams) {
-    const { domain } = args;
-    if (!domain) {
+    const { domainName } = args;
+    if (!domainName) {
       throw new McpError(
         ErrorCode.InvalidParams,
-        'domain parameter is required'
+        'domainName parameter is required'
       );
     }
     
-    const result = await this.namecheapClient.domainsGetInfo(domain);
+    const result = await this.namecheapClient.domainsGetInfo(args);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async handleDomainsGetContacts(args: DomainsGetContactsParams) {
+    const { domainName } = args;
+    if (!domainName) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'domainName parameter is required'
+      );
+    }
+    
+    const result = await this.namecheapClient.domainsGetContacts(args);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async handleDomainsCreate(args: DomainsCreateParams) {
+    const result = await this.namecheapClient.domainsCreate(args);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async handleDomainsGetTldList(args: DomainsGetTldListParams) {
+    const result = await this.namecheapClient.domainsGetTldList(args);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async handleDomainsSetContacts(args: DomainsSetContactsParams) {
+    const { domainName } = args;
+    if (!domainName) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'domainName parameter is required'
+      );
+    }
+    
+    const result = await this.namecheapClient.domainsSetContacts(args);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async handleDomainsReactivate(args: DomainsReactivateParams) {
+    const { domainName } = args;
+    if (!domainName) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'domainName parameter is required'
+      );
+    }
+    
+    const result = await this.namecheapClient.domainsReactivate(args);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async handleDomainsRenew(args: DomainsRenewParams) {
+    const { domainName, years } = args;
+    if (!domainName || !years) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'domainName and years parameters are required'
+      );
+    }
+    
+    const result = await this.namecheapClient.domainsRenew(args);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async handleDomainsGetRegistrarLock(args: DomainsGetRegistrarLockParams) {
+    const { domainName } = args;
+    if (!domainName) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'domainName parameter is required'
+      );
+    }
+    
+    const result = await this.namecheapClient.domainsGetRegistrarLock(args);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async handleDomainsSetRegistrarLock(args: DomainsSetRegistrarLockParams) {
+    const { domainName, lockAction } = args;
+    if (!domainName || !lockAction) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'domainName and lockAction parameters are required'
+      );
+    }
+    
+    const result = await this.namecheapClient.domainsSetRegistrarLock(args);
     return {
       content: [
         {
@@ -227,9 +411,14 @@ class NamecheapMcpServer {
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error('Namecheap MCP server running on stdio');
+    
+    // Use stderr for status messages
+    process.stderr.write('Namecheap MCP server running on stdio\n');
   }
 }
 
 const server = new NamecheapMcpServer();
-server.run().catch(console.error);
+server.run().catch((error) => {
+  process.stderr.write(`Server error: ${error}\n`);
+  process.exit(1);
+});

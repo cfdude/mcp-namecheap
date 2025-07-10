@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+bin/
 
 # Environment files
 .env
@@ -27,6 +28,7 @@ yarn-error.log*
 # OS files
 .DS_Store
 Thumbs.db
+**/.DS_Store
 
 # Test coverage
 coverage/

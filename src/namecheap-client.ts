@@ -1,5 +1,18 @@
 import axios, { AxiosInstance } from 'axios';
-import type { DnsHost, DomainsListParams } from './types.js';
+import type { 
+  DnsHost, 
+  DomainsListParams,
+  DomainsCheckParams,
+  DomainsGetInfoParams,
+  DomainsGetContactsParams,
+  DomainsCreateParams,
+  DomainsGetTldListParams,
+  DomainsSetContactsParams,
+  DomainsReactivateParams,
+  DomainsRenewParams,
+  DomainsGetRegistrarLockParams,
+  DomainsSetRegistrarLockParams
+} from './types.js';
 
 export class NamecheapClient {
   private axios: AxiosInstance;
@@ -61,8 +74,8 @@ export class NamecheapClient {
     return this.parseXmlToJson(response.data);
   }
 
-  async domainsCheck(domains: string[]) {
-    const domainList = domains.join(',');
+  async domainsCheck(params: DomainsCheckParams) {
+    const domainList = params.domainList.join(',');
     
     const response = await this.axios.get('', {
       params: {
@@ -74,11 +87,120 @@ export class NamecheapClient {
     return this.parseXmlToJson(response.data);
   }
 
-  async domainsGetInfo(domainName: string) {
+  async domainsGetInfo(params: DomainsGetInfoParams) {
     const response = await this.axios.get('', {
       params: {
         Command: 'namecheap.domains.getInfo',
-        DomainName: domainName,
+        DomainName: params.domainName,
+        HostName: params.hostName,
+      },
+    });
+
+    return this.parseXmlToJson(response.data);
+  }
+
+  async domainsGetContacts(params: DomainsGetContactsParams) {
+    const response = await this.axios.get('', {
+      params: {
+        Command: 'namecheap.domains.getContacts',
+        DomainName: params.domainName,
+      },
+    });
+
+    return this.parseXmlToJson(response.data);
+  }
+
+  async domainsCreate(params: DomainsCreateParams) {
+    const apiParams: Record<string, string | number | boolean | undefined> = {
+      Command: 'namecheap.domains.create',
+      DomainName: params.domainName,
+      Years: params.years,
+    };
+
+    // Add all registrant information
+    Object.keys(params).forEach(key => {
+      if (key !== 'domainName' && key !== 'years' && params[key as keyof DomainsCreateParams] !== undefined) {
+        // Convert camelCase to PascalCase for API
+        const apiKey = key.charAt(0).toUpperCase() + key.slice(1);
+        apiParams[apiKey] = params[key as keyof DomainsCreateParams];
+      }
+    });
+
+    const response = await this.axios.get('', { params: apiParams });
+    return this.parseXmlToJson(response.data);
+  }
+
+  async domainsGetTldList(_params?: DomainsGetTldListParams) {
+    const response = await this.axios.get('', {
+      params: {
+        Command: 'namecheap.domains.getTldList',
+      },
+    });
+
+    return this.parseXmlToJson(response.data);
+  }
+
+  async domainsSetContacts(params: DomainsSetContactsParams) {
+    const apiParams: Record<string, string | undefined> = {
+      Command: 'namecheap.domains.setContacts',
+      DomainName: params.domainName,
+    };
+
+    // Add all contact information
+    Object.keys(params).forEach(key => {
+      if (key !== 'domainName' && params[key as keyof DomainsSetContactsParams] !== undefined) {
+        // Convert camelCase to PascalCase for API
+        const apiKey = key.charAt(0).toUpperCase() + key.slice(1);
+        apiParams[apiKey] = params[key as keyof DomainsSetContactsParams];
+      }
+    });
+
+    const response = await this.axios.get('', { params: apiParams });
+    return this.parseXmlToJson(response.data);
+  }
+
+  async domainsReactivate(params: DomainsReactivateParams) {
+    const response = await this.axios.get('', {
+      params: {
+        Command: 'namecheap.domains.reactivate',
+        DomainName: params.domainName,
+        IsPremiumDomain: params.isPremiumDomain,
+      },
+    });
+
+    return this.parseXmlToJson(response.data);
+  }
+
+  async domainsRenew(params: DomainsRenewParams) {
+    const response = await this.axios.get('', {
+      params: {
+        Command: 'namecheap.domains.renew',
+        DomainName: params.domainName,
+        Years: params.years,
+        IsPremiumDomain: params.isPremiumDomain,
+      },
+    });
+
+    return this.parseXmlToJson(response.data);
+  }
+
+  async domainsGetRegistrarLock(params: DomainsGetRegistrarLockParams) {
+    const response = await this.axios.get('', {
+      params: {
+        Command: 'namecheap.domains.getRegistrarLock',
+        DomainName: params.domainName,
+      },
+    });
+
+    return this.parseXmlToJson(response.data);
+  }
+
+  async domainsSetRegistrarLock(params: DomainsSetRegistrarLockParams) {
+    const response = await this.axios.get('', {
+      params: {
+        Command: 'namecheap.domains.setRegistrarLock',
+        DomainName: params.domainName,
+        LockAction: params.lockAction,
       },
     });
 

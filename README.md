@@ -12,9 +12,10 @@ A Model Context Protocol (MCP) server that provides tools for interacting with t
 
 ## Prerequisites
 
-- Node.js 20 or higher
+- Node.js 18 or higher
 - Namecheap account with API access enabled
-- API key from Namecheap (get it from https://ap.www.namecheap.com/settings/tools/apiaccess/)
+- Production API key from Namecheap (get it from https://ap.www.namecheap.com/settings/tools/apiaccess/)
+- Sandbox API key for testing (register at https://www.sandbox.namecheap.com and enable API access)
 
 ## Installation
 
@@ -38,9 +39,16 @@ cp .env.example .env
 
 4. Edit `.env` and add your Namecheap API credentials:
 ```env
-NAMECHEAP_API_KEY=your_api_key_here
+# Production API Key (from Namecheap account settings)
+NAMECHEAP_API_KEY=your_production_api_key_here
+
+# Sandbox API Key (from https://www.sandbox.namecheap.com)
+NAMECHEAP_SANDBOX_API_KEY=your_sandbox_api_key_here
+
 NAMECHEAP_API_USER=your_api_username_here
 NAMECHEAP_CLIENT_IP=your_whitelisted_ip_here
+
+# Set to 'true' to use sandbox API, 'false' for production
 NAMECHEAP_USE_SANDBOX=true
 ```
 
@@ -61,7 +69,8 @@ docker build -t mcp-namecheap .
 2. Run with environment variables:
 ```bash
 docker run -i \
-  -e NAMECHEAP_API_KEY=your_api_key \
+  -e NAMECHEAP_API_KEY=your_production_api_key \
+  -e NAMECHEAP_SANDBOX_API_KEY=your_sandbox_api_key \
   -e NAMECHEAP_API_USER=your_username \
   -e NAMECHEAP_CLIENT_IP=your_ip \
   -e NAMECHEAP_USE_SANDBOX=true \
@@ -85,7 +94,8 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "command": "node",
       "args": ["/path/to/mcp-namecheap/dist/index.js"],
       "env": {
-        "NAMECHEAP_API_KEY": "your_api_key",
+        "NAMECHEAP_API_KEY": "your_production_api_key",
+        "NAMECHEAP_SANDBOX_API_KEY": "your_sandbox_api_key",
         "NAMECHEAP_API_USER": "your_username",
         "NAMECHEAP_CLIENT_IP": "your_ip",
         "NAMECHEAP_USE_SANDBOX": "true"
@@ -105,7 +115,9 @@ smithery install mcp-namecheap
 
 ## Available Tools
 
-### `namecheap_domains_list`
+### Domain Management Tools
+
+#### `namecheap_domains_list`
 Lists all domains in your Namecheap account.
 
 Parameters:
@@ -113,27 +125,97 @@ Parameters:
 - `searchTerm` (optional): Filter domains by search term
 - `page` (optional): Page number for pagination
 - `pageSize` (optional): Number of results per page
+- `sortBy` (optional): Sort order - "NAME", "NAME_DESC", "EXPIREDATE", "EXPIREDATE_DESC", "CREATEDATE", "CREATEDATE_DESC"
 
-### `namecheap_domains_check`
-Checks if domains are available for registration.
+#### `namecheap_domains_check`
+Checks if domains are available for registration. **Supports bulk checking!**
 
 Parameters:
-- `domains` (required): Array of domain names to check
+- `domainList` (required): Array of domain names to check (can check multiple domains at once)
 
-### `namecheap_domains_getinfo`
+#### `namecheap_domains_getinfo`
 Gets detailed information about a specific domain.
 
 Parameters:
-- `domain` (required): Domain name to get information for
+- `domainName` (required): Domain name to get information for
+- `hostName` (optional): Hosted domain name for which domain information needs to be requested
 
-### `namecheap_dns_getlist`
+#### `namecheap_domains_getcontacts`
+Gets contact information for a domain.
+
+Parameters:
+- `domainName` (required): Domain name to get contacts for
+
+#### `namecheap_domains_create`
+Registers a new domain name.
+
+Parameters:
+- `domainName` (required): Domain name to register
+- `years` (required): Number of years to register (1-10)
+- `registrantFirstName` (required): Registrant first name
+- `registrantLastName` (required): Registrant last name
+- `registrantAddress1` (required): Registrant address
+- `registrantCity` (required): Registrant city
+- `registrantStateProvince` (required): Registrant state/province
+- `registrantPostalCode` (required): Registrant postal code
+- `registrantCountry` (required): Registrant country code (e.g., "US")
+- `registrantPhone` (required): Registrant phone number
+- `registrantEmailAddress` (required): Registrant email address
+- Additional optional contact fields for admin, tech, and billing contacts
+- `nameservers` (optional): Comma-separated list of nameservers
+- `addFreeWhoisguard` (optional): "yes" or "no" (default: "yes")
+- `wgEnabled` (optional): Enable WhoisGuard privacy protection "yes" or "no" (default: "yes")
+
+#### `namecheap_domains_gettldlist`
+Gets a list of all supported TLDs (Top Level Domains).
+
+No parameters required.
+
+#### `namecheap_domains_setcontacts`
+Updates contact information for a domain.
+
+Parameters:
+- `domainName` (required): Domain name to update
+- Various contact fields (all optional) for registrant, admin, tech, and billing contacts
+
+#### `namecheap_domains_reactivate`
+Reactivates an expired domain.
+
+Parameters:
+- `domainName` (required): Domain name to reactivate
+- `isPremiumDomain` (optional): Whether this is a premium domain (default: false)
+
+#### `namecheap_domains_renew`
+Renews an expiring domain.
+
+Parameters:
+- `domainName` (required): Domain name to renew
+- `years` (required): Number of years to renew (1-10)
+- `isPremiumDomain` (optional): Whether this is a premium domain (default: false)
+
+#### `namecheap_domains_getregistrarlock`
+Gets the registrar lock status of a domain.
+
+Parameters:
+- `domainName` (required): Domain name to check lock status
+
+#### `namecheap_domains_setregistrarlock`
+Sets the registrar lock status for a domain.
+
+Parameters:
+- `domainName` (required): Domain name to lock/unlock
+- `lockAction` (required): "LOCK" or "UNLOCK"
+
+### DNS Management Tools
+
+#### `namecheap_dns_getlist`
 Retrieves DNS host records for a domain.
 
 Parameters:
 - `sld` (required): Second level domain (e.g., "example" from "example.com")
 - `tld` (required): Top level domain (e.g., "com" from "example.com")
 
-### `namecheap_dns_setcustom`
+#### `namecheap_dns_setcustom`
 Sets custom nameservers for a domain.
 
 Parameters:
@@ -141,7 +223,7 @@ Parameters:
 - `tld` (required): Top level domain
 - `nameservers` (required): Array of nameserver addresses
 
-### `namecheap_dns_sethosts`
+#### `namecheap_dns_sethosts`
 Sets DNS host records for a domain.
 
 Parameters:
@@ -152,7 +234,7 @@ Parameters:
   - `recordType`: "A", "AAAA", "CNAME", "MX", "TXT", "NS", "SRV", or "CAA"
   - `address`: Value for the DNS record
   - `mxPriority` (optional): Priority for MX records
-  - `ttl` (optional): Time to live in seconds
+  - `ttl` (optional): Time to live in seconds (default: 1800)
 
 ## Development
 

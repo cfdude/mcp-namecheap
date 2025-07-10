@@ -2,10 +2,13 @@
   "name": "mcp-namecheap",
   "version": "1.0.0",
   "main": "dist/index.js",
+  "bin": {
+    "mcp-namecheap": "./bin/mcp-namecheap"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.js",
+    "start": "node --no-warnings dist/index.js",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "test": "echo \"No tests yet\" && exit 0",
@@ -27,7 +30,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.15.0",
     "axios": "^1.10.0",
-    "dotenv": "^17.2.0"
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
