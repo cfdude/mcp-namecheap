@@ -44,3 +44,8 @@ temp/
 *.crt
 secrets/
 credentials/
+
+# Claude-specific files
+.claude/
+CLAUDE.md
+.mcp.json
