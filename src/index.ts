@@ -11,6 +11,7 @@ import {
 import dotenv from 'dotenv';
 import { NamecheapClient } from './namecheap-client.js';
 import { namecheapTools } from './tools.js';
+import { TldCache } from './tld-cache.js';
 import type {
   DomainsListParams,
   DomainsCheckParams,
@@ -50,6 +51,7 @@ if (!API_KEY || !API_USER || !CLIENT_IP) {
 class NamecheapMcpServer {
   private server: Server;
   private namecheapClient: NamecheapClient;
+  private tldCache: TldCache;
 
   constructor() {
     this.server = new Server(
@@ -70,6 +72,8 @@ class NamecheapMcpServer {
       CLIENT_IP!,
       USE_SANDBOX
     );
+
+    this.tldCache = new TldCache(this.namecheapClient);
 
     this.setupHandlers();
     
@@ -237,7 +241,15 @@ class NamecheapMcpServer {
   }
 
   private async handleDomainsGetTldList(args: DomainsGetTldListParams) {
-    const result = await this.namecheapClient.domainsGetTldList(args);
+    // Use the TldCache to get filtered and paginated results
+    const result = await this.tldCache.getTlds({
+      search: args.search,
+      registerable: args.registerable,
+      page: args.page,
+      pageSize: args.pageSize,
+      sortBy: args.sortBy,
+    });
+    
     return {
       content: [
         {
