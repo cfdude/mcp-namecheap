@@ -1,436 +1,305 @@
-#!/usr/bin/env node --no-warnings
-
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ErrorCode,
-  ListToolsRequestSchema,
-  McpError,
-} from '@modelcontextprotocol/sdk/types.js';
-import dotenv from 'dotenv';
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
 import { NamecheapClient } from './namecheap-client.js';
-import { namecheapTools } from './tools.js';
 import { TldCache } from './tld-cache.js';
-import type {
-  DomainsListParams,
-  DomainsCheckParams,
-  DomainsGetInfoParams,
-  DomainsGetContactsParams,
-  DomainsCreateParams,
-  DomainsGetTldListParams,
-  DomainsSetContactsParams,
-  DomainsReactivateParams,
-  DomainsRenewParams,
-  DomainsGetRegistrarLockParams,
-  DomainsSetRegistrarLockParams,
-  DnsGetListParams,
-  DnsSetCustomParams,
-  DnsSetHostsParams
-} from './types.js';
 
-// Load environment variables from .env file for development
-// Claude Desktop will pass them directly via config
-dotenv.config();
-
-const USE_SANDBOX = process.env.NAMECHEAP_USE_SANDBOX === 'true';
-const API_KEY = USE_SANDBOX 
-  ? process.env.NAMECHEAP_SANDBOX_API_KEY 
-  : process.env.NAMECHEAP_API_KEY;
-const API_USER = process.env.NAMECHEAP_API_USER;
-const CLIENT_IP = process.env.NAMECHEAP_CLIENT_IP;
-
-if (!API_KEY || !API_USER || !CLIENT_IP) {
-  // Write to stderr to avoid interfering with MCP protocol on stdout
-  process.stderr.write('Missing required environment variables: NAMECHEAP_API_KEY/NAMECHEAP_SANDBOX_API_KEY, NAMECHEAP_API_USER, NAMECHEAP_CLIENT_IP\n');
-  process.stderr.write(`Current env: USE_SANDBOX=${USE_SANDBOX}, API_KEY=${API_KEY ? 'set' : 'missing'}, API_USER=${API_USER || 'missing'}, CLIENT_IP=${CLIENT_IP || 'missing'}\n`);
-  process.stderr.write(`Working directory: ${process.cwd()}\n`);
-  process.exit(1);
-}
-
-class NamecheapMcpServer {
-  private server: Server;
-  private namecheapClient: NamecheapClient;
-  private tldCache: TldCache;
-
-  constructor() {
-    this.server = new Server(
-      {
-        name: 'mcp-namecheap',
-        version: '1.0.0',
-      },
-      {
-        capabilities: {
-          tools: {},
-        },
-      }
-    );
-
-    this.namecheapClient = new NamecheapClient(
-      API_KEY!,
-      API_USER!,
-      CLIENT_IP!,
-      USE_SANDBOX
-    );
-
-    this.tldCache = new TldCache(this.namecheapClient);
-
-    this.setupHandlers();
-    
-    this.server.onerror = (error) => process.stderr.write(`[MCP Error] ${error}\n`);
-    process.on('SIGINT', async () => {
-      await this.server.close();
-      process.exit(0);
-    });
-  }
-
-  private setupHandlers() {
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: namecheapTools,
-    }));
-
-    this.server.setRequestHandler(
-      CallToolRequestSchema,
-      async (request) => {
-        const { name, arguments: args } = request.params;
-
-        try {
-          switch (name) {
-            case 'namecheap_domains_list':
-              return await this.handleDomainsList((args as unknown as DomainsListParams) || {});
-            
-            case 'namecheap_domains_check':
-              return await this.handleDomainsCheck(args as unknown as DomainsCheckParams);
-            
-            case 'namecheap_domains_getinfo':
-              return await this.handleDomainsGetInfo(args as unknown as DomainsGetInfoParams);
-            
-            case 'namecheap_domains_getcontacts':
-              return await this.handleDomainsGetContacts(args as unknown as DomainsGetContactsParams);
-            
-            case 'namecheap_domains_create':
-              return await this.handleDomainsCreate(args as unknown as DomainsCreateParams);
-            
-            case 'namecheap_domains_gettldlist':
-              return await this.handleDomainsGetTldList(args as unknown as DomainsGetTldListParams);
-            
-            case 'namecheap_domains_setcontacts':
-              return await this.handleDomainsSetContacts(args as unknown as DomainsSetContactsParams);
-            
-            case 'namecheap_domains_reactivate':
-              return await this.handleDomainsReactivate(args as unknown as DomainsReactivateParams);
-            
-            case 'namecheap_domains_renew':
-              return await this.handleDomainsRenew(args as unknown as DomainsRenewParams);
-            
-            case 'namecheap_domains_getregistrarlock':
-              return await this.handleDomainsGetRegistrarLock(args as unknown as DomainsGetRegistrarLockParams);
-            
-            case 'namecheap_domains_setregistrarlock':
-              return await this.handleDomainsSetRegistrarLock(args as unknown as DomainsSetRegistrarLockParams);
-            
-            case 'namecheap_dns_getlist':
-              return await this.handleDnsGetList(args as unknown as DnsGetListParams);
-            
-            case 'namecheap_dns_setcustom':
-              return await this.handleDnsSetCustom(args as unknown as DnsSetCustomParams);
-            
-            case 'namecheap_dns_sethosts':
-              return await this.handleDnsSetHosts(args as unknown as DnsSetHostsParams);
-            
-            default:
-              throw new McpError(
-                ErrorCode.MethodNotFound,
-                `Unknown tool: ${name}`
-              );
-          }
-        } catch (error) {
-          if (error instanceof McpError) throw error;
-          
-          throw new McpError(
-            ErrorCode.InternalError,
-            `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`
-          );
-        }
-      }
-    );
-  }
-
-  private async handleDomainsList(args: DomainsListParams) {
-    const result = await this.namecheapClient.domainsList(args);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleDomainsCheck(args: DomainsCheckParams) {
-    const { domainList } = args;
-    if (!domainList || !Array.isArray(domainList)) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'domainList parameter must be an array'
-      );
-    }
-    
-    const result = await this.namecheapClient.domainsCheck(args);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleDomainsGetInfo(args: DomainsGetInfoParams) {
-    const { domainName } = args;
-    if (!domainName) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'domainName parameter is required'
-      );
-    }
-    
-    const result = await this.namecheapClient.domainsGetInfo(args);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleDomainsGetContacts(args: DomainsGetContactsParams) {
-    const { domainName } = args;
-    if (!domainName) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'domainName parameter is required'
-      );
-    }
-    
-    const result = await this.namecheapClient.domainsGetContacts(args);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleDomainsCreate(args: DomainsCreateParams) {
-    const result = await this.namecheapClient.domainsCreate(args);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleDomainsGetTldList(args: DomainsGetTldListParams) {
-    // Use the TldCache to get filtered and paginated results
-    const result = await this.tldCache.getTlds({
-      search: args.search,
-      registerable: args.registerable,
-      page: args.page,
-      pageSize: args.pageSize,
-      sortBy: args.sortBy,
-    });
-    
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleDomainsSetContacts(args: DomainsSetContactsParams) {
-    const { domainName } = args;
-    if (!domainName) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'domainName parameter is required'
-      );
-    }
-    
-    const result = await this.namecheapClient.domainsSetContacts(args);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleDomainsReactivate(args: DomainsReactivateParams) {
-    const { domainName } = args;
-    if (!domainName) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'domainName parameter is required'
-      );
-    }
-    
-    const result = await this.namecheapClient.domainsReactivate(args);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleDomainsRenew(args: DomainsRenewParams) {
-    const { domainName, years } = args;
-    if (!domainName || !years) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'domainName and years parameters are required'
-      );
-    }
-    
-    const result = await this.namecheapClient.domainsRenew(args);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleDomainsGetRegistrarLock(args: DomainsGetRegistrarLockParams) {
-    const { domainName } = args;
-    if (!domainName) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'domainName parameter is required'
-      );
-    }
-    
-    const result = await this.namecheapClient.domainsGetRegistrarLock(args);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleDomainsSetRegistrarLock(args: DomainsSetRegistrarLockParams) {
-    const { domainName, lockAction } = args;
-    if (!domainName || !lockAction) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'domainName and lockAction parameters are required'
-      );
-    }
-    
-    const result = await this.namecheapClient.domainsSetRegistrarLock(args);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleDnsGetList(args: DnsGetListParams) {
-    const { sld, tld } = args;
-    if (!sld || !tld) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'sld and tld parameters are required'
-      );
-    }
-    
-    const result = await this.namecheapClient.dnsGetList(sld, tld);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleDnsSetCustom(args: DnsSetCustomParams) {
-    const { sld, tld, nameservers } = args;
-    if (!sld || !tld || !nameservers || !Array.isArray(nameservers)) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'sld, tld, and nameservers (array) parameters are required'
-      );
-    }
-    
-    const result = await this.namecheapClient.dnsSetCustom(sld, tld, nameservers);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleDnsSetHosts(args: DnsSetHostsParams) {
-    const { sld, tld, hosts } = args;
-    if (!sld || !tld || !hosts || !Array.isArray(hosts)) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'sld, tld, and hosts (array) parameters are required'
-      );
-    }
-    
-    const result = await this.namecheapClient.dnsSetHosts(sld, tld, hosts);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  async run() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    
-    // Use stderr for status messages
-    process.stderr.write('Namecheap MCP server running on stdio\n');
-  }
-}
-
-const server = new NamecheapMcpServer();
-server.run().catch((error) => {
-  process.stderr.write(`Server error: ${error}\n`);
-  process.exit(1);
+// Configuration schema for Smithery
+export const configSchema = z.object({
+  NAMECHEAP_API_KEY: z.string().describe("Namecheap API key"),
+  NAMECHEAP_API_USER: z.string().describe("Namecheap API username"),  
+  NAMECHEAP_CLIENT_IP: z.string().describe("Whitelisted IP address for API access"),
+  NAMECHEAP_USE_SANDBOX: z.boolean().optional().default(false).describe("Use sandbox API endpoint")
 });
+
+export default function ({ config }: { config: z.infer<typeof configSchema> }) {
+  const server = new McpServer({
+    name: "mcp-namecheap",
+    version: "1.0.0",
+  });
+
+  const namecheapClient = new NamecheapClient(
+    config.NAMECHEAP_API_KEY,
+    config.NAMECHEAP_API_USER,
+    config.NAMECHEAP_CLIENT_IP,
+    config.NAMECHEAP_USE_SANDBOX
+  );
+
+  const tldCache = new TldCache(namecheapClient);
+
+  // Domain listing tool
+  server.tool(
+    "namecheap_domains_list",
+    "Get a list of domains in your Namecheap account",
+    {
+      listType: z.enum(["ALL", "EXPIRING", "EXPIRED"]).optional().default("ALL").describe("Type of list to return"),
+      page: z.number().optional().default(1).describe("Page number for pagination"),
+      pageSize: z.number().optional().default(20).describe("Number of domains per page"),
+      searchTerm: z.string().optional().describe("Filter domains by search term"),
+      sortBy: z.enum(["NAME", "NAME_DESC", "EXPIREDATE", "EXPIREDATE_DESC", "CREATEDATE", "CREATEDATE_DESC"]).optional().describe("Sort order for results")
+    },
+    async (args) => {
+      const result = await namecheapClient.domainsList(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+      };
+    }
+  );
+
+  // Domain availability check
+  server.tool(
+    "namecheap_domains_check",
+    "Check if domains are available for registration (supports bulk checks)",
+    {
+      domainList: z.array(z.string()).describe("List of domain names to check availability")
+    },
+    async (args) => {
+      const result = await namecheapClient.domainsCheck(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+      };
+    }
+  );
+
+  // Get domain information
+  server.tool(
+    "namecheap_domains_getinfo",
+    "Get detailed information about a specific domain",
+    {
+      domainName: z.string().describe("Domain name to get information for"),
+      hostName: z.string().optional().describe("Hosted domain name")
+    },
+    async (args) => {
+      const result = await namecheapClient.domainsGetInfo(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+      };
+    }
+  );
+
+  // Get domain contacts
+  server.tool(
+    "namecheap_domains_getcontacts",
+    "Get contact information for a domain",
+    {
+      domainName: z.string().describe("Domain name to get contacts for")
+    },
+    async (args) => {
+      const result = await namecheapClient.domainsGetContacts(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+      };
+    }
+  );
+
+  // Register domain
+  server.tool(
+    "namecheap_domains_create",
+    "Register a new domain name",
+    {
+      domainName: z.string().describe("Domain name to register"),
+      years: z.number().min(1).max(10).describe("Number of years to register"),
+      registrantFirstName: z.string().describe("Registrant first name"),
+      registrantLastName: z.string().describe("Registrant last name"),
+      registrantAddress1: z.string().describe("Registrant address line 1"),
+      registrantCity: z.string().describe("Registrant city"),
+      registrantStateProvince: z.string().describe("Registrant state/province"),
+      registrantPostalCode: z.string().describe("Registrant postal code"),
+      registrantCountry: z.string().describe("Registrant country code"),
+      registrantPhone: z.string().describe("Registrant phone number"),
+      registrantEmailAddress: z.string().describe("Registrant email address"),
+      registrantOrganizationName: z.string().optional().describe("Registrant organization name"),
+      techFirstName: z.string().optional().describe("Tech contact first name"),
+      techLastName: z.string().optional().describe("Tech contact last name"),
+      techEmailAddress: z.string().optional().describe("Tech contact email"),
+      adminFirstName: z.string().optional().describe("Admin contact first name"),
+      adminLastName: z.string().optional().describe("Admin contact last name"),
+      adminEmailAddress: z.string().optional().describe("Admin contact email"),
+      nameservers: z.string().optional().describe("Comma-separated list of nameservers"),
+      addFreeWhoisguard: z.enum(["yes", "no"]).optional().default("yes").describe("Add free WhoisGuard privacy protection"),
+      wgEnabled: z.enum(["yes", "no"]).optional().default("yes").describe("Enable WhoisGuard privacy protection")
+    },
+    async (args) => {
+      const result = await namecheapClient.domainsCreate(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+      };
+    }
+  );
+
+  // Get TLD list
+  server.tool(
+    "namecheap_domains_gettldlist",
+    "Get a list of all supported TLDs with filtering and pagination",
+    {
+      page: z.number().optional().default(1).describe("Page number for pagination"),
+      pageSize: z.number().max(200).optional().default(50).describe("Number of TLDs per page"),
+      search: z.string().optional().describe("Search for TLDs containing this text"),
+      registerable: z.boolean().optional().describe("Filter to only show TLDs that can be registered via API"),
+      sortBy: z.enum(["name", "popularity"]).optional().default("name").describe("Sort TLDs by name or popularity")
+    },
+    async (args) => {
+      const result = await tldCache.getTlds({
+        search: args.search as string | undefined,
+        registerable: args.registerable as boolean | undefined,
+        page: args.page as number | undefined,
+        pageSize: args.pageSize as number | undefined,
+        sortBy: args.sortBy as "name" | "popularity" | undefined,
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+      };
+    }
+  );
+
+  // Update domain contacts
+  server.tool(
+    "namecheap_domains_setcontacts",
+    "Update contact information for a domain",
+    {
+      domainName: z.string().describe("Domain name to update contacts for"),
+      registrantFirstName: z.string().describe("Registrant first name"),
+      registrantLastName: z.string().describe("Registrant last name"),
+      registrantAddress1: z.string().describe("Registrant address"),
+      registrantCity: z.string().describe("Registrant city"),
+      registrantStateProvince: z.string().describe("Registrant state/province"),
+      registrantPostalCode: z.string().describe("Registrant postal code"),
+      registrantCountry: z.string().describe("Registrant country code"),
+      registrantPhone: z.string().describe("Registrant phone"),
+      registrantEmailAddress: z.string().describe("Registrant email"),
+      techFirstName: z.string().optional().describe("Tech contact first name"),
+      techLastName: z.string().optional().describe("Tech contact last name"),
+      techEmailAddress: z.string().optional().describe("Tech contact email"),
+      adminFirstName: z.string().optional().describe("Admin contact first name"),
+      adminLastName: z.string().optional().describe("Admin contact last name"),
+      adminEmailAddress: z.string().optional().describe("Admin contact email")
+    },
+    async (args) => {
+      const result = await namecheapClient.domainsSetContacts(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+      };
+    }
+  );
+
+  // Reactivate expired domain
+  server.tool(
+    "namecheap_domains_reactivate",
+    "Reactivate an expired domain",
+    {
+      domainName: z.string().describe("Domain name to reactivate"),
+      isPremiumDomain: z.boolean().optional().default(false).describe("Whether this is a premium domain")
+    },
+    async (args) => {
+      const result = await namecheapClient.domainsReactivate(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+      };
+    }
+  );
+
+  // Renew domain
+  server.tool(
+    "namecheap_domains_renew",
+    "Renew an expiring domain",
+    {
+      domainName: z.string().describe("Domain name to renew"),
+      years: z.number().min(1).max(10).describe("Number of years to renew"),
+      isPremiumDomain: z.boolean().optional().default(false).describe("Whether this is a premium domain")
+    },
+    async (args) => {
+      const result = await namecheapClient.domainsRenew(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+      };
+    }
+  );
+
+  // Get registrar lock status
+  server.tool(
+    "namecheap_domains_getregistrarlock",
+    "Get the registrar lock status of a domain",
+    {
+      domainName: z.string().describe("Domain name to check lock status")
+    },
+    async (args) => {
+      const result = await namecheapClient.domainsGetRegistrarLock(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+      };
+    }
+  );
+
+  // Set registrar lock status
+  server.tool(
+    "namecheap_domains_setregistrarlock",
+    "Set the registrar lock status for a domain",
+    {
+      domainName: z.string().describe("Domain name to lock/unlock"),
+      lockAction: z.enum(["LOCK", "UNLOCK"]).describe("Lock or unlock the domain")
+    },
+    async (args) => {
+      const result = await namecheapClient.domainsSetRegistrarLock(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+      };
+    }
+  );
+
+  // DNS get list
+  server.tool(
+    "namecheap_dns_getlist",
+    "Get DNS host records for a domain",
+    {
+      sld: z.string().describe("Second level domain (e.g., 'example' from 'example.com')"),
+      tld: z.string().describe("Top level domain (e.g., 'com' from 'example.com')")
+    },
+    async (args) => {
+      const result = await namecheapClient.dnsGetList(args.sld, args.tld);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+      };
+    }
+  );
+
+  // DNS set custom nameservers
+  server.tool(
+    "namecheap_dns_setcustom",
+    "Set custom nameservers for a domain",
+    {
+      sld: z.string().describe("Second level domain"),
+      tld: z.string().describe("Top level domain"),
+      nameservers: z.array(z.string()).describe("List of nameserver addresses")
+    },
+    async (args) => {
+      const result = await namecheapClient.dnsSetCustom(args.sld, args.tld, args.nameservers);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+      };
+    }
+  );
+
+  // DNS set host records
+  server.tool(
+    "namecheap_dns_sethosts",
+    "Set DNS host records for a domain",
+    {
+      sld: z.string().describe("Second level domain"),
+      tld: z.string().describe("Top level domain"),
+      hosts: z.array(z.object({
+        hostname: z.string().describe("Subdomain or @ for root"),
+        recordType: z.enum(["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SRV", "CAA"]).describe("DNS record type"),
+        address: z.string().describe("Value for the DNS record"),
+        ttl: z.number().optional().default(1800).describe("Time to live in seconds"),
+        mxPriority: z.number().optional().describe("Priority for MX records")
+      })).describe("Array of DNS host records")
+    },
+    async (args) => {
+      const result = await namecheapClient.dnsSetHosts(args.sld, args.tld, args.hosts);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+      };
+    }
+  );
+
+  return server.server;
+}

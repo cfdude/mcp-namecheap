@@ -16,12 +16,24 @@
   },
   "keywords": [
     "mcp",
+    "mcp-server",
+    "model-context-protocol",
     "namecheap",
     "dns",
     "domains",
-    "api"
+    "api",
+    "domain-management",
+    "dns-management"
   ],
-  "author": "",
+  "author": "Rob Sherman",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cfdude/mcp-namecheap.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cfdude/mcp-namecheap/issues"
+  },
+  "homepage": "https://github.com/cfdude/mcp-namecheap#readme",
   "license": "MIT",
   "description": "MCP server for interacting with Namecheap API",
   "mcp": {
@@ -30,7 +42,8 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.15.0",
     "axios": "^1.10.0",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
