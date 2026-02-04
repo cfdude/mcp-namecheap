@@ -2,14 +2,18 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { NamecheapClient } from './namecheap-client.js';
 import { TldCache } from './tld-cache.js';
+import type { DnsHost } from './types.js';
 
 // Configuration schema for Smithery
 export const configSchema = z.object({
   NAMECHEAP_API_KEY: z.string().describe("Namecheap API key"),
-  NAMECHEAP_API_USER: z.string().describe("Namecheap API username"),  
+  NAMECHEAP_API_USER: z.string().describe("Namecheap API username"),
   NAMECHEAP_CLIENT_IP: z.string().describe("Whitelisted IP address for API access"),
   NAMECHEAP_USE_SANDBOX: z.boolean().optional().default(false).describe("Use sandbox API endpoint")
 });
+
+// Type helper to work around MCP SDK type inference depth limits
+type ToolArgs = Record<string, unknown>;
 
 export default function ({ config }: { config: z.infer<typeof configSchema> }) {
   const server = new McpServer({
@@ -37,10 +41,10 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
       searchTerm: z.string().optional().describe("Filter domains by search term"),
       sortBy: z.enum(["NAME", "NAME_DESC", "EXPIREDATE", "EXPIREDATE_DESC", "CREATEDATE", "CREATEDATE_DESC"]).optional().describe("Sort order for results")
     },
-    async (args) => {
-      const result = await namecheapClient.domainsList(args);
+    async (args: ToolArgs) => {
+      const result = await namecheapClient.domainsList(args as unknown as Parameters<typeof namecheapClient.domainsList>[0]);
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
       };
     }
   );
@@ -52,10 +56,10 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
     {
       domainList: z.array(z.string()).describe("List of domain names to check availability")
     },
-    async (args) => {
-      const result = await namecheapClient.domainsCheck(args);
+    async (args: ToolArgs) => {
+      const result = await namecheapClient.domainsCheck(args as unknown as Parameters<typeof namecheapClient.domainsCheck>[0]);
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
       };
     }
   );
@@ -68,10 +72,10 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
       domainName: z.string().describe("Domain name to get information for"),
       hostName: z.string().optional().describe("Hosted domain name")
     },
-    async (args) => {
-      const result = await namecheapClient.domainsGetInfo(args);
+    async (args: ToolArgs) => {
+      const result = await namecheapClient.domainsGetInfo(args as unknown as Parameters<typeof namecheapClient.domainsGetInfo>[0]);
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
       };
     }
   );
@@ -83,10 +87,10 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
     {
       domainName: z.string().describe("Domain name to get contacts for")
     },
-    async (args) => {
-      const result = await namecheapClient.domainsGetContacts(args);
+    async (args: ToolArgs) => {
+      const result = await namecheapClient.domainsGetContacts(args as unknown as Parameters<typeof namecheapClient.domainsGetContacts>[0]);
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
       };
     }
   );
@@ -118,10 +122,10 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
       addFreeWhoisguard: z.enum(["yes", "no"]).optional().default("yes").describe("Add free WhoisGuard privacy protection"),
       wgEnabled: z.enum(["yes", "no"]).optional().default("yes").describe("Enable WhoisGuard privacy protection")
     },
-    async (args) => {
-      const result = await namecheapClient.domainsCreate(args);
+    async (args: ToolArgs) => {
+      const result = await namecheapClient.domainsCreate(args as unknown as Parameters<typeof namecheapClient.domainsCreate>[0]);
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
       };
     }
   );
@@ -137,7 +141,7 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
       registerable: z.boolean().optional().describe("Filter to only show TLDs that can be registered via API"),
       sortBy: z.enum(["name", "popularity"]).optional().default("name").describe("Sort TLDs by name or popularity")
     },
-    async (args) => {
+    async (args: ToolArgs) => {
       const result = await tldCache.getTlds({
         search: args.search as string | undefined,
         registerable: args.registerable as boolean | undefined,
@@ -146,7 +150,7 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
         sortBy: args.sortBy as "name" | "popularity" | undefined,
       });
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
       };
     }
   );
@@ -173,10 +177,10 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
       adminLastName: z.string().optional().describe("Admin contact last name"),
       adminEmailAddress: z.string().optional().describe("Admin contact email")
     },
-    async (args) => {
-      const result = await namecheapClient.domainsSetContacts(args);
+    async (args: ToolArgs) => {
+      const result = await namecheapClient.domainsSetContacts(args as unknown as Parameters<typeof namecheapClient.domainsSetContacts>[0]);
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
       };
     }
   );
@@ -189,10 +193,10 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
       domainName: z.string().describe("Domain name to reactivate"),
       isPremiumDomain: z.boolean().optional().default(false).describe("Whether this is a premium domain")
     },
-    async (args) => {
-      const result = await namecheapClient.domainsReactivate(args);
+    async (args: ToolArgs) => {
+      const result = await namecheapClient.domainsReactivate(args as unknown as Parameters<typeof namecheapClient.domainsReactivate>[0]);
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
       };
     }
   );
@@ -206,10 +210,10 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
       years: z.number().min(1).max(10).describe("Number of years to renew"),
       isPremiumDomain: z.boolean().optional().default(false).describe("Whether this is a premium domain")
     },
-    async (args) => {
-      const result = await namecheapClient.domainsRenew(args);
+    async (args: ToolArgs) => {
+      const result = await namecheapClient.domainsRenew(args as unknown as Parameters<typeof namecheapClient.domainsRenew>[0]);
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
       };
     }
   );
@@ -221,10 +225,10 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
     {
       domainName: z.string().describe("Domain name to check lock status")
     },
-    async (args) => {
-      const result = await namecheapClient.domainsGetRegistrarLock(args);
+    async (args: ToolArgs) => {
+      const result = await namecheapClient.domainsGetRegistrarLock(args as unknown as Parameters<typeof namecheapClient.domainsGetRegistrarLock>[0]);
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
       };
     }
   );
@@ -237,10 +241,10 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
       domainName: z.string().describe("Domain name to lock/unlock"),
       lockAction: z.enum(["LOCK", "UNLOCK"]).describe("Lock or unlock the domain")
     },
-    async (args) => {
-      const result = await namecheapClient.domainsSetRegistrarLock(args);
+    async (args: ToolArgs) => {
+      const result = await namecheapClient.domainsSetRegistrarLock(args as unknown as Parameters<typeof namecheapClient.domainsSetRegistrarLock>[0]);
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
       };
     }
   );
@@ -253,10 +257,10 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
       sld: z.string().describe("Second level domain (e.g., 'example' from 'example.com')"),
       tld: z.string().describe("Top level domain (e.g., 'com' from 'example.com')")
     },
-    async (args) => {
-      const result = await namecheapClient.dnsGetList(args.sld, args.tld);
+    async (args: ToolArgs) => {
+      const result = await namecheapClient.dnsGetList(args.sld as string, args.tld as string);
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
       };
     }
   );
@@ -270,10 +274,10 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
       tld: z.string().describe("Top level domain"),
       nameservers: z.array(z.string()).describe("List of nameserver addresses")
     },
-    async (args) => {
-      const result = await namecheapClient.dnsSetCustom(args.sld, args.tld, args.nameservers);
+    async (args: ToolArgs) => {
+      const result = await namecheapClient.dnsSetCustom(args.sld as string, args.tld as string, args.nameservers as string[]);
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
       };
     }
   );
@@ -293,10 +297,23 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
         mxPriority: z.number().optional().describe("Priority for MX records")
       })).describe("Array of DNS host records")
     },
-    async (args) => {
-      const result = await namecheapClient.dnsSetHosts(args.sld, args.tld, args.hosts);
+    async (args: ToolArgs) => {
+      const hosts = (args.hosts as Array<{
+        hostname: string;
+        recordType: string;
+        address: string;
+        ttl?: number;
+        mxPriority?: number;
+      }>).map(h => ({
+        hostname: h.hostname,
+        recordType: h.recordType as DnsHost['recordType'],
+        address: h.address,
+        ttl: h.ttl,
+        mxPriority: h.mxPriority
+      }));
+      const result = await namecheapClient.dnsSetHosts(args.sld as string, args.tld as string, hosts);
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
       };
     }
   );
