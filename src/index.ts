@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+// @ts-nocheck - MCP SDK 1.25.x has excessively deep type inference that exceeds TypeScript limits
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { NamecheapClient } from './namecheap-client.js';
