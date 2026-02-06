@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// @ts-nocheck - MCP SDK 1.25.x has excessively deep type inference that exceeds TypeScript limits
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as dotenv from "dotenv";
 import * as path from "path";
