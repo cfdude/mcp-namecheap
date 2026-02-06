@@ -10,7 +10,9 @@ jobs:
     strategy:
       matrix:
         node-version: [18, 20]
-    
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+
     steps:
       - uses: actions/checkout@v4
       
@@ -21,7 +23,7 @@ jobs:
           cache: 'npm'
           
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
         
       - name: Run tests
         run: npm test
