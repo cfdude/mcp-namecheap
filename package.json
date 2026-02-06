@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
-    "start": "node --no-warnings dist/index.js",
+    "start": "node --no-warnings dist/stdio.js",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "test": "echo \"No tests yet\" && exit 0",
