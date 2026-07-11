@@ -23,7 +23,7 @@ A Model Context Protocol (MCP) server that provides tools for interacting with t
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/mcp-namecheap.git
+git clone https://github.com/cfdude/mcp-namecheap.git
 cd mcp-namecheap
 ```
 
@@ -39,11 +39,9 @@ cp .env.example .env
 
 4. Edit `.env` and add your Namecheap API credentials:
 ```env
-# Production API Key (from Namecheap account settings)
-NAMECHEAP_API_KEY=your_production_api_key_here
-
-# Sandbox API Key (from https://www.sandbox.namecheap.com)
-NAMECHEAP_SANDBOX_API_KEY=your_sandbox_api_key_here
+# API key (production key from Namecheap account settings,
+# or sandbox key from https://www.sandbox.namecheap.com)
+NAMECHEAP_API_KEY=your_api_key_here
 
 NAMECHEAP_API_USER=your_api_username_here
 NAMECHEAP_CLIENT_IP=your_whitelisted_ip_here
@@ -69,8 +67,7 @@ docker build -t mcp-namecheap .
 2. Run with environment variables:
 ```bash
 docker run -i \
-  -e NAMECHEAP_API_KEY=your_production_api_key \
-  -e NAMECHEAP_SANDBOX_API_KEY=your_sandbox_api_key \
+  -e NAMECHEAP_API_KEY=your_api_key \
   -e NAMECHEAP_API_USER=your_username \
   -e NAMECHEAP_CLIENT_IP=your_ip \
   -e NAMECHEAP_USE_SANDBOX=true \
@@ -81,28 +78,90 @@ docker run -i \
 
 ### MCP Client Configuration
 
-Add the server to your MCP client configuration:
+Add the server to your MCP client configuration. The entry point for all stdio clients is `dist/stdio.js`.
+
+In every example below, the `env` block is optional if you created a `.env` file in the mcp-namecheap directory (the server loads it automatically).
 
 #### For Claude Desktop
 
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
   "mcpServers": {
     "namecheap": {
       "command": "node",
-      "args": ["/path/to/mcp-namecheap/dist/index.js"],
+      "args": ["/path/to/mcp-namecheap/dist/stdio.js"],
       "env": {
-        "NAMECHEAP_API_KEY": "your_production_api_key",
-        "NAMECHEAP_SANDBOX_API_KEY": "your_sandbox_api_key",
+        "NAMECHEAP_API_KEY": "your_api_key",
         "NAMECHEAP_API_USER": "your_username",
         "NAMECHEAP_CLIENT_IP": "your_ip",
-        "NAMECHEAP_USE_SANDBOX": "true"
+        "NAMECHEAP_USE_SANDBOX": "false"
       }
     }
   }
 }
+```
+
+Restart Claude Desktop after saving.
+
+#### For Claude Code (CLI)
+
+Register the server at user scope so it is available in all your projects:
+
+```bash
+claude mcp add --scope user namecheap -- node /path/to/mcp-namecheap/dist/stdio.js
+```
+
+To pass credentials explicitly instead of using the `.env` file, add `-e` flags before the `--` separator:
+
+```bash
+claude mcp add --scope user namecheap \
+  -e NAMECHEAP_API_KEY=your_api_key \
+  -e NAMECHEAP_API_USER=your_username \
+  -e NAMECHEAP_CLIENT_IP=your_ip \
+  -- node /path/to/mcp-namecheap/dist/stdio.js
+```
+
+Check the connection with `claude mcp list`.
+
+#### For OpenCode
+
+Add an `mcp` section to `~/.config/opencode/opencode.json` (global) or to `opencode.json` in a project:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "namecheap": {
+      "type": "local",
+      "command": ["node", "/path/to/mcp-namecheap/dist/stdio.js"],
+      "enabled": true,
+      "environment": {
+        "NAMECHEAP_API_KEY": "your_api_key",
+        "NAMECHEAP_API_USER": "your_username",
+        "NAMECHEAP_CLIENT_IP": "your_ip"
+      }
+    }
+  }
+}
+```
+
+Check the connection with `opencode mcp list`.
+
+#### For Codex CLI
+
+Add an `mcp_servers` table to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.namecheap]
+command = "node"
+args = ["/path/to/mcp-namecheap/dist/stdio.js"]
+
+[mcp_servers.namecheap.env]
+NAMECHEAP_API_KEY = "your_api_key"
+NAMECHEAP_API_USER = "your_username"
+NAMECHEAP_CLIENT_IP = "your_ip"
 ```
 
 #### For Smithery
