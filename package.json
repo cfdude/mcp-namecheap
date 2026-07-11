@@ -5,6 +5,10 @@
   "bin": {
     "mcp-namecheap": "./bin/mcp-namecheap"
   },
+  "files": [
+    "dist",
+    "bin"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
