@@ -243,6 +243,16 @@ export class NamecheapClient {
       TLD: tld,
     };
 
+    // Namecheap's account-level Mail Settings (Email Forwarding / Custom MX / etc.)
+    // silently override any MX records passed to setHosts unless EmailType is
+    // explicitly switched to "MX". Without this, a domain left on the default
+    // "Email Forwarding" mail setting keeps re-asserting its own eforward*.
+    // registrar-servers.com MX records regardless of what's sent here — the API
+    // still returns IsSuccess=true, so the failure is silent.
+    if (hosts.some((host) => host.recordType === 'MX')) {
+      params.EmailType = 'MX';
+    }
+
     // Add host records
     hosts.forEach((host, index) => {
       const idx = index + 1;
