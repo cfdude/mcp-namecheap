@@ -266,18 +266,36 @@ export class NamecheapClient {
   }
 
   async dnsSetCustom(sld: string, tld: string, nameservers: string[]) {
+    // Namecheap expects ONE comma-separated `Nameservers` parameter. This previously sent
+    // indexed NameServers1/NameServers2 (the shape setHosts uses for records), which the API
+    // silently ignores -- every call failed with "Parameter Nameservers is Missing".
     const params: Record<string, string> = {
       Command: 'namecheap.domains.dns.setCustom',
       SLD: sld,
       TLD: tld,
+      Nameservers: nameservers.join(','),
     };
 
-    // Add nameservers
-    nameservers.forEach((ns, index) => {
-      params[`NameServers${index + 1}`] = ns;
-    });
-
     const response = await this.axios.get('', { params });
+
+    return this.parseXmlToJson(response.data);
+  }
+
+  /**
+   * Revert the domain to Namecheap's own (BasicDNS) nameservers.
+   *
+   * This is the correct call for "put DNS back at the registrar" -- setCustom with
+   * dns1/dns2.registrar-servers.com hand-typed is not the same thing and leaves the domain
+   * flagged as CUSTOM.
+   */
+  async dnsSetDefault(sld: string, tld: string) {
+    const response = await this.axios.get('', {
+      params: {
+        Command: 'namecheap.domains.dns.setDefault',
+        SLD: sld,
+        TLD: tld,
+      },
+    });
 
     return this.parseXmlToJson(response.data);
   }

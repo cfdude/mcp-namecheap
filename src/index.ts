@@ -283,6 +283,22 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
     }
   );
 
+  // DNS revert to registrar's own nameservers
+  server.tool(
+    "namecheap_dns_setdefault",
+    "Revert the domain to Namecheap's own (BasicDNS) nameservers. Use this to put DNS back at the registrar -- it is not the same as setcustom with dns1/dns2.registrar-servers.com typed by hand, which leaves the domain flagged CUSTOM.",
+    {
+      sld: z.string().describe("Second level domain"),
+      tld: z.string().describe("Top level domain")
+    },
+    async (args: ToolArgs) => {
+      const result = await namecheapClient.dnsSetDefault(args.sld as string, args.tld as string);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
+      };
+    }
+  );
+
   // DNS set custom nameservers
   server.tool(
     "namecheap_dns_setcustom",
