@@ -383,7 +383,31 @@ export const namecheapTools: Tool[] = [
   },
   {
     name: 'namecheap_dns_getlist',
-    description: 'Get DNS host records for a domain',
+    description:
+      "Get the domain's NAMESERVERS (namecheap.domains.dns.getList). This does NOT return " +
+      'DNS host records -- use namecheap_dns_gethosts for those.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sld: {
+          type: 'string',
+          description: 'Second level domain (e.g., "example" from "example.com")',
+        },
+        tld: {
+          type: 'string',
+          description: 'Top level domain (e.g., "com" from "example.com")',
+        },
+      },
+      required: ['sld', 'tld'],
+    },
+  },
+  {
+    name: 'namecheap_dns_gethosts',
+    description:
+      "Get the domain's DNS host records (A/AAAA/CNAME/MX/TXT/NS/SRV/CAA). REQUIRED BEFORE " +
+      'namecheap_dns_sethosts: setHosts REPLACES the entire record set, so you must read the ' +
+      'current records, apply your change, and send them ALL back. Returns a `hosts` array in ' +
+      'exactly the shape sethosts accepts.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -426,7 +450,10 @@ export const namecheapTools: Tool[] = [
   },
   {
     name: 'namecheap_dns_sethosts',
-    description: 'Set DNS host records for a domain',
+    description:
+      'DESTRUCTIVE -- REPLACES the domain\'s ENTIRE DNS record set. Any record not included in ' +
+      '`hosts` is DELETED. Always call namecheap_dns_gethosts first and pass back the full set ' +
+      'with your modification applied.',
     inputSchema: {
       type: 'object',
       properties: {

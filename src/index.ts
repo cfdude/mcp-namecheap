@@ -254,13 +254,29 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
   // DNS get list
   server.tool(
     "namecheap_dns_getlist",
-    "Get DNS host records for a domain",
+    "Get the domain's NAMESERVERS (namecheap.domains.dns.getList). This does NOT return DNS host records -- use namecheap_dns_gethosts for those.",
     {
       sld: z.string().describe("Second level domain (e.g., 'example' from 'example.com')"),
       tld: z.string().describe("Top level domain (e.g., 'com' from 'example.com')")
     },
     async (args: ToolArgs) => {
       const result = await namecheapClient.dnsGetList(args.sld as string, args.tld as string);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
+      };
+    }
+  );
+
+  // DNS get host records -- REQUIRED before any sethosts call
+  server.tool(
+    "namecheap_dns_gethosts",
+    "Get the domain's DNS host records (A/AAAA/CNAME/MX/TXT/NS/SRV/CAA). REQUIRED BEFORE namecheap_dns_sethosts: setHosts REPLACES the entire record set, so read first, apply your change, and send them ALL back. Returns a `hosts` array in exactly the shape sethosts accepts.",
+    {
+      sld: z.string().describe("Second level domain (e.g., 'example' from 'example.com')"),
+      tld: z.string().describe("Top level domain (e.g., 'com' from 'example.com')")
+    },
+    async (args: ToolArgs) => {
+      const result = await namecheapClient.dnsGetHosts(args.sld as string, args.tld as string);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }]
       };
@@ -287,7 +303,7 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
   // DNS set host records
   server.tool(
     "namecheap_dns_sethosts",
-    "Set DNS host records for a domain",
+    "DESTRUCTIVE -- REPLACES the domain's ENTIRE DNS record set. Any record not included in `hosts` is DELETED. Always call namecheap_dns_gethosts first and pass back the full set with your modification applied.",
     {
       sld: z.string().describe("Second level domain"),
       tld: z.string().describe("Top level domain"),

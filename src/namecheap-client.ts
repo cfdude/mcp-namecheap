@@ -219,6 +219,52 @@ export class NamecheapClient {
     return this.parseXmlToJson(response.data);
   }
 
+  /**
+   * Read the domain's DNS host records.
+   *
+   * REQUIRED BEFORE dnsSetHosts. Namecheap's setHosts REPLACES the entire record
+   * set -- it is not an upsert -- so writing without first reading deletes every
+   * record you did not resend. Note this is a different API command from
+   * dnsGetList, which returns NAMESERVERS, not records.
+   */
+  async dnsGetHosts(sld: string, tld: string) {
+    const response = await this.axios.get('', {
+      params: {
+        Command: 'namecheap.domains.dns.getHosts',
+        SLD: sld,
+        TLD: tld,
+      },
+    });
+
+    const parsed = this.parseXmlToJson(response.data);
+
+    // Also surface the records in exactly the shape dnsSetHosts accepts, so a
+    // read-modify-write needs no hand translation between the two (the field
+    // names differ: Namecheap returns Name/Type/Address/MXPref/TTL).
+    const hosts: DnsHost[] = [];
+    const raw = typeof parsed === 'object' && parsed !== null ? (parsed as { raw?: string }).raw : undefined;
+    const xml = raw ?? (typeof response.data === 'string' ? response.data : '');
+    for (const m of xml.matchAll(/<host\b[^>]*\/>/gi)) {
+      const tag = m[0];
+      const attr = (name: string) => {
+        const a = tag.match(new RegExp(`\\b${name}="([^"]*)"`, 'i'));
+        return a ? a[1] : undefined;
+      };
+      const hostname = attr('Name');
+      const recordType = attr('Type');
+      const address = attr('Address');
+      if (!hostname || !recordType || address === undefined) continue;
+      const host: DnsHost = { hostname, recordType: recordType as DnsHost['recordType'], address };
+      const mx = attr('MXPref');
+      if (mx !== undefined && mx !== '' && recordType.toUpperCase() === 'MX') host.mxPriority = Number(mx);
+      const ttl = attr('TTL');
+      if (ttl !== undefined && ttl !== '') host.ttl = Number(ttl);
+      hosts.push(host);
+    }
+
+    return { ...(parsed as Record<string, unknown>), hosts };
+  }
+
   async dnsSetCustom(sld: string, tld: string, nameservers: string[]) {
     const params: Record<string, string> = {
       Command: 'namecheap.domains.dns.setCustom',
@@ -236,6 +282,11 @@ export class NamecheapClient {
     return this.parseXmlToJson(response.data);
   }
 
+  /**
+   * DESTRUCTIVE: replaces the domain's ENTIRE record set with `hosts`.
+   * Any record not present in this array is DELETED. Always dnsGetHosts first
+   * and pass back the full set with your modification applied.
+   */
   async dnsSetHosts(sld: string, tld: string, hosts: DnsHost[]) {
     const params: Record<string, string | number> = {
       Command: 'namecheap.domains.dns.setHosts',
