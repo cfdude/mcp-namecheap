@@ -476,7 +476,7 @@ export const namecheapTools: Tool[] = [
               },
               recordType: {
                 type: 'string',
-                enum: ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SRV', 'CAA'],
+                enum: ['A', 'AAAA', 'ALIAS', 'CAA', 'CNAME', 'FRAME', 'MX', 'NS', 'SRV', 'TXT', 'URL', 'URL301'],
                 description: 'DNS record type',
               },
               address: {

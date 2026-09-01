@@ -325,7 +325,7 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
       tld: z.string().describe("Top level domain"),
       hosts: z.array(z.object({
         hostname: z.string().describe("Subdomain or @ for root"),
-        recordType: z.enum(["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SRV", "CAA"]).describe("DNS record type"),
+        recordType: z.enum(["A", "AAAA", "ALIAS", "CAA", "CNAME", "FRAME", "MX", "NS", "SRV", "TXT", "URL", "URL301"]).describe("DNS record type"),
         address: z.string().describe("Value for the DNS record"),
         ttl: z.number().optional().default(1800).describe("Time to live in seconds"),
         mxPriority: z.number().optional().describe("Priority for MX records")

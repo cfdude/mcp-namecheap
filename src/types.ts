@@ -180,7 +180,10 @@ export interface DnsSetCustomParams {
 
 export interface DnsHost {
   hostname: string;
-  recordType: 'A' | 'AAAA' | 'CNAME' | 'MX' | 'TXT' | 'NS' | 'SRV' | 'CAA';
+  // Namecheap-specific types (URL, URL301, FRAME, ALIAS) are NOT optional extras: they are
+// what parked/redirecting domains actually use. Omitting them broke round-tripping --
+  // gethosts returns a URL record, sethosts rejects it, and the zone becomes uneditable.
+  recordType: 'A' | 'AAAA' | 'ALIAS' | 'CAA' | 'CNAME' | 'FRAME' | 'MX' | 'NS' | 'SRV' | 'TXT' | 'URL' | 'URL301';
   address: string;
   mxPriority?: number;
   ttl?: number;
